@@ -90,7 +90,7 @@ def check_10x_version(path):
                 data[2] = 'Gene Expression'
                 data.to_csv(
                     features_path,
-                    header=None,
+                    header=False,
                     index=False,
                     sep='\t',
                     compression='gzip'
@@ -111,8 +111,8 @@ def check_10x_version(path):
                 data[1] = data[0]
                 data.to_csv(
                     genes_path,
-                    header=None,
-                    index=None,
+                    header=False,
+                    index=False,
                     sep='\t'
                 )
             elif len(data.columns) != 2:
@@ -125,6 +125,32 @@ def check_10x_version(path):
 
     else:
         raise ValueError('No matrix file was found in the provided directory.')
+
+
+def fix_10x_barcode_dtype(path, name):
+    """Compatible with BD's 10X matrix"""
+    filenames = ['barcodes.tsv.gz', 'barcodes.tsv']
+
+    for filename in filenames:
+        file_path = path / filename
+        if file_path.exists():
+            bc_path = str(file_path)
+            break
+    else:
+        raise ValueError('No barcodes file found.')
+
+    bc = pd.read_csv(bc_path, header=None)
+    if bc[0].dtype == 'int64':
+        print('A BD format 10x matrix found')
+        bc[0] = name + '_' + bc[0].astype('str')
+
+        if bc_path.endswith('.gz'):
+            bc.to_csv(bc_path, header=False, index=False, compression='gzip')
+        else:
+            bc.to_csv(bc_path, header=False, index=False)
+
+    else:
+        pass
 
 
 def process_and_write_data(
@@ -189,6 +215,7 @@ def trans_tsv(input, name, output):
 def trans_10x_mtx(input, name, output):
     p = decompress_10x_mtx(input)
     _ = check_10x_version(p)
+    fix_10x_barcode_dtype(p, name)
 
     adata = sc.read_10x_mtx(p)
     process_and_write_data(adata, output, name)
